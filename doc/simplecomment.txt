@@ -1,0 +1,19 @@
+*simplecomment.txt*  Comment operator for Vim9
+
+SimpleComment uses 'commentstring' to toggle comments without a language
+table of its own.
+
+                                                *:SimpleCommentToggle*
+:SimpleCommentToggle     Toggle the current line or supplied range.
+                                                *:SimpleCommentHealth*
+:SimpleCommentHealth     Show the active comment configuration.
+
+                                                *simplecomment-mappings*
+gcc                      Toggle the current line.
+gc{motion}               Toggle the operated lines.
+{Visual}gc               Toggle the selected lines.
+
+Set g:simplecomment_default_mappings to zero before loading to disable the
+default keys.  The three <Plug> mappings remain available.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
