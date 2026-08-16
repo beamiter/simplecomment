@@ -1,12 +1,14 @@
 *simplecomment.txt*  Comment operator for Vim9
 
-SimpleComment uses 'commentstring' to toggle comments without a language
-table of its own.
+SimpleComment toggles comments with the buffer's 'commentstring', and asks
+Vim's syntax engine first so that a region written in another language gets
+that language's markers instead.
 
                                                 *:SimpleCommentToggle*
 :SimpleCommentToggle     Toggle the current line or supplied range.
                                                 *:SimpleCommentHealth*
-:SimpleCommentHealth     Show the active comment configuration.
+:SimpleCommentHealth     Show the active comment configuration, including the
+                         region detected on the current line.
 
                                                 *simplecomment-mappings*
 gcc                      Toggle the current line.
@@ -15,5 +17,71 @@ gc{motion}               Toggle the operated lines.
 
 Set g:simplecomment_default_mappings to zero before loading to disable the
 default keys.  The three <Plug> mappings remain available.
+
+                                                *simplecomment-regions*
+REGIONS
+
+'commentstring' is buffer-local, so it describes the buffer and nothing else.
+In an HTML file that meant a line of JavaScript inside <script> came out as
+`<!-- let x = 1; -->`, a CSS rule inside <style> the same, and a line inside a
+```rust fence in a Markdown file too.  None of those compile.
+
+Before commenting a range, SimpleComment asks |synstack()| what region the
+range sits in.  When every non-blank line of the range is inside one region
+whose language is not the buffer's own, that language's markers are used;
+otherwise the buffer's 'commentstring' is, exactly as before.  Markdown fences
+are read from the fence line, since Markdown's syntax file does not name the
+language of a fenced block.
+
+"Not the buffer's own" covers more than the file type's name.  syntax/cpp.vim
+sources syntax/c.vim, so C++ code is highlighted with cType and cStatement, and
+syntax/scss.vim and syntax/less.vim source syntax/css.vim the same way.  That
+is the buffer writing itself, not a region inside it, so C in C++ and CSS in
+SCSS or Less keep the buffer's 'commentstring' -- a C++ file where you set it
+to // by hand goes on getting //, and a line that already reads /* ... */ gets
+commented rather than mistaken for one of ours and stripped.
+
+The whole range has to agree, and that is deliberate.  A range covering a whole
+<script> element would otherwise come back as >
+
+    <!-- <script> -->
+    // let x = 1;
+    <!-- </script> -->
+<
+where the JavaScript line is no longer inside a script element at all and
+renders on the page as text.  A range that crosses a region boundary is being
+edited as the enclosing language, so it gets the enclosing markers.  Keeping
+the whole range in one region is also what makes `gc` its own inverse: the
+region's delimiters are left alone, so toggling again finds the same region.
+
+A context that cannot be told is never guessed at.  Vim's own JavaScript syntax
+says nothing about JSX markup, for instance, so a JSX child keeps the buffer's
+'commentstring' rather than a made-up `{/* */}`; a syntax plugin that marks the
+markup (jsxRegion and friends) makes it work.  Likewise a fence whose language
+has no entry in the table below, or no language at all.
+
+                                                *g:simplecomment_commentstrings*
+A dict of language name to 'commentstring'-shaped format, merged over the
+built-in table, so overriding one language leaves the others alone: >
+
+    g:simplecomment_commentstrings = {javascript: '/* %s */'}
+<
+Set an entry to an empty string to put that language back on the buffer's
+'commentstring'.  Languages known out of the box: c, cpp, css, go, html, java,
+javascript, jsx, lua, markdown, perl, php, python, ruby, rust, scss, sh, sql,
+toml, tsx, typescript, vim, xml and yaml, plus the usual short spellings (js,
+py, rb, rs, ts, yml, bash, c++ ...).  JSON is deliberately absent: it has no
+comment syntax, so there is no right answer to record.
+
+                                                *g:simplecomment_context_lines*
+How many lines a range may have before detection is skipped.  Default 2000.
+Asking the syntax engine costs 6 to 31 microseconds a line, which is more than
+everything else a toggle does, so a very long range keeps the buffer's
+'commentstring' rather than stalling.  Set it to zero to turn detection off
+altogether and get the pre-region behaviour back.
+
+In practice the limit rarely bites: the first non-blank line settles the answer
+for any range that starts in the buffer's own language, so an ordinary file
+pays for one |synID()| call however long the range is.
 
 vim:tw=78:ts=8:noet:ft=help:norl:
