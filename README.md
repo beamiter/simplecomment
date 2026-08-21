@@ -37,4 +37,5 @@ name is never guessed at; it falls back to `commentstring` as well.
 (`{javascript: '/* %s */'}`, an empty string to disable one) and
 `g:simplecomment_context_lines` caps how long a range may be before detection
 is skipped (default 2000, zero to turn it off). `:SimpleCommentHealth` shows
-what the current line resolves to.
+what the current line resolves to. Language aliases such as `js` are accepted
+as override keys; invalid option types fall back to the defaults.

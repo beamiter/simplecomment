@@ -71,14 +71,16 @@ Set an entry to an empty string to put that language back on the buffer's
 javascript, jsx, lua, markdown, perl, php, python, ruby, rust, scss, sh, sql,
 toml, tsx, typescript, vim, xml and yaml, plus the usual short spellings (js,
 py, rb, rs, ts, yml, bash, c++ ...).  JSON is deliberately absent: it has no
-comment syntax, so there is no right answer to record.
+comment syntax, so there is no right answer to record.  Alias keys are
+canonicalized too, and an invalid table or non-string entry is ignored.
 
                                                 *g:simplecomment_context_lines*
 How many lines a range may have before detection is skipped.  Default 2000.
 Asking the syntax engine costs 6 to 31 microseconds a line, which is more than
 everything else a toggle does, so a very long range keeps the buffer's
 'commentstring' rather than stalling.  Set it to zero to turn detection off
-altogether and get the pre-region behaviour back.
+altogether and get the pre-region behaviour back.  A negative value is treated
+as zero; an invalid type falls back to 2000.
 
 In practice the limit rarely bites: the first non-blank line settles the answer
 for any range that starts in the buffer's own language, so an ordinary file

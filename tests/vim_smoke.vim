@@ -54,6 +54,18 @@ setline(1, ['  <!-- -->', "\t<!-- -->", '  <!-- x -->'])
 simplecomment#Toggle(1, 3)
 assert_equal(['  ', "\t", '  x'], getline(1, 3))
 
+# Search options are user interface state, not parser configuration.  C-style
+# markers contain `*`, and blank/indent patterns contain `*` as a quantifier;
+# both used to change meaning under 'nomagic'.
+set nomagic
+setline(1, ['one', '  two', ''])
+setlocal commentstring=/*\ %s\ */
+simplecomment#Toggle(1, 3)
+assert_equal(['/* one */', '  /* two */', ''], getline(1, 3))
+simplecomment#Toggle(1, 3)
+assert_equal(['one', '  two', ''], getline(1, 3))
+set magic
+
 setlocal commentstring=/*%s*/
 setline(1, ['    /* */'])
 deletebufline('%', 2, '$')

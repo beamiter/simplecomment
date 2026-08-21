@@ -254,6 +254,35 @@ simplecomment#Toggle(3, 4)
 assert_equal(['    <!-- let x = 1; -->', '    <!-- let y = 2; -->'], getline(3, 4))
 unlet g:simplecomment_context_lines
 
+# Runtime configuration is read on every toggle.  A typo must fall back to the
+# defaults instead of throwing from an operator, and alias keys are normalized
+# the same way fence/filetype names are.
+g:simplecomment_context_lines = 'many'
+Open('embedded.html', '<!--%s-->')
+try
+  simplecomment#Toggle(3, 3)
+catch
+  assert_report('a mistyped context limit threw: ' .. v:exception)
+endtry
+assert_equal('    // let x = 1;', getline(3))
+unlet g:simplecomment_context_lines
+
+g:simplecomment_commentstrings = []
+Open('embedded.html', '<!--%s-->')
+try
+  simplecomment#Toggle(3, 3)
+catch
+  assert_report('a mistyped commentstring table threw: ' .. v:exception)
+endtry
+assert_equal('    // let x = 1;', getline(3))
+
+g:simplecomment_commentstrings = {js: '/* %s */'}
+Open('embedded.html', '<!--%s-->')
+simplecomment#Toggle(3, 3)
+assert_equal('    /* let x = 1; */', getline(3),
+  'a documented language alias did not override its canonical entry')
+unlet g:simplecomment_commentstrings
+
 # --- health says which of the two answers is in play -----------------------
 
 Open('embedded.html', '<!--%s-->')

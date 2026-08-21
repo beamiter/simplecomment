@@ -100,7 +100,12 @@ const HOST_DIALECTS = {
 # A fenced Markdown block delimiter, opening or closing.  One pattern for both
 # because both matter: the opening one carries the language, and the closing
 # one must never be mistaken for it.
-const FENCE = '^\s*\%(`\{3,}\|\~\{3,}\)'
+# Internal patterns must not inherit the user's 'magic' setting.  In
+# particular, under :set nomagic the `*` in a blank-line test becomes literal
+# and the escaped `*` in C's /* marker becomes a quantifier.  That made the
+# same toggle produce different text according to an unrelated search option.
+const FENCE = '\m^\s*\%(`\{3,}\|\~\{3,}\)'
+const BLANK = '\m^\s*$'
 
 # Rebuilt at the start of every range that detects context, and read by the
 # helpers below.  Toggle() is a synchronous edit that cannot re-enter itself,
@@ -147,10 +152,10 @@ def Region(format: string): dict<string>
   return {
     prefix: left .. ' ',
     suffix: empty(right) ? '' : ' ' .. right,
-    opener: '^\s*' .. Escape(left) .. '\%($\|\s\)',
-    closer: empty(right) ? '' : Escape(right) .. '\s*$',
-    strip_left: '^\s*\zs' .. Escape(left) .. '\s\?',
-    strip_right: empty(right) ? '' : '\s\?' .. Escape(right) .. '\s*$',
+    opener: '\m^\s*' .. Escape(left) .. '\%($\|\s\)',
+    closer: empty(right) ? '' : '\m' .. Escape(right) .. '\s*$',
+    strip_left: '\m^\s*\zs' .. Escape(left) .. '\s\?',
+    strip_right: empty(right) ? '' : '\m\s\?' .. Escape(right) .. '\s*$',
   }
 enddef
 
@@ -164,15 +169,15 @@ def IsCommented(line: string, region: dict<string>): bool
 enddef
 
 def CommentLine(line: string, region: dict<string>): string
-  if line =~# '^\s*$'
+  if line =~# BLANK
     return line
   endif
-  var indent = matchstr(line, '^\s*')
+  var indent = matchstr(line, '\m^\s*')
   return indent .. region.prefix .. strpart(line, strlen(indent)) .. region.suffix
 enddef
 
 def UncommentLine(line: string, region: dict<string>): string
-  if line =~# '^\s*$'
+  if line =~# BLANK
     return line
   endif
   # The closer comes off first, and off the line with its indent and opener
@@ -190,7 +195,7 @@ def Canonical(name: string): string
 enddef
 
 def BufferLanguage(): string
-  return Canonical(tolower(matchstr(&l:filetype, '^[^.]*')))
+  return Canonical(tolower(matchstr(&l:filetype, '\m^[^.]*')))
 enddef
 
 # Is this language the buffer writing itself rather than a region inside it?
@@ -221,7 +226,7 @@ def LanguageOfGroup(group: string): string
   var lowered = tolower(group)
   var language = ''
   for key in s_language_keys
-    if stridx(lowered, key) == 0 && strpart(group, strlen(key), 1) !~# '^\l'
+    if stridx(lowered, key) == 0 && strpart(group, strlen(key), 1) !~# '\m^\l'
       language = Canonical(key)
       break
     endif
@@ -262,7 +267,7 @@ def ContextLanguage(lnum: number, text: string, buffer_language: string): string
   # Markdown and, by clearing the cache, also ends the run of lines that share
   # a fence.  Everything between two delimiters is one block, which is what
   # lets the lines in between reuse the scan.
-  if buffer_language ==# 'markdown' && group =~# '^markdown\%(Code\|Highlight\)'
+  if buffer_language ==# 'markdown' && group =~# '\m^markdown\%(Code\|Highlight\)'
     if text =~# FENCE
       s_fence_known = false
       return ''
@@ -304,6 +309,14 @@ def RegionFor(language: string, fallback: dict<string>): dict<string>
   return s_regions[language]
 enddef
 
+def ContextLimit(): number
+  var configured: any = get(g:, 'simplecomment_context_lines', 2000)
+  if type(configured) != v:t_number
+    return 2000
+  endif
+  return max([0, configured])
+enddef
+
 # Asking the syntax engine costs 4 to 16 microseconds a line here depending on
 # the file type -- more than everything else Toggle() does put together -- and
 # it can only answer at all for a buffer whose syntax file was loaded.  So ask
@@ -315,14 +328,26 @@ enddef
 # and what every range did before.  g:simplecomment_context_lines raises the
 # budget, or turns detection off when set to zero.
 def Detecting(count: number): bool
-  var limit = get(g:, 'simplecomment_context_lines', 2000)
+  var limit = ContextLimit()
   return limit > 0 && count <= limit
     && exists('g:syntax_on') && !empty(get(b:, 'current_syntax', ''))
 enddef
 
 def Prepare()
-  var overrides: dict<string> = get(g:, 'simplecomment_commentstrings', {})
-  s_commentstrings = extend(copy(DEFAULT_COMMENTSTRINGS), overrides)
+  s_commentstrings = copy(DEFAULT_COMMENTSTRINGS)
+  var configured: any = get(g:, 'simplecomment_commentstrings', {})
+  if type(configured) == v:t_dict
+    for [name, format] in items(configured)
+      if type(format) != v:t_string || empty(name)
+        continue
+      endif
+      # Filetypes, syntax groups and Markdown fence names are canonicalized;
+      # configuration keys must take the same path.  Otherwise `{js: ...}` was
+      # accepted into the table but never read, because the detected language
+      # had already become `javascript` by RegionFor().
+      s_commentstrings[Canonical(tolower(name))] = format
+    endfor
+  endif
   s_language_keys = sort(keys(s_commentstrings) + keys(LANGUAGE_ALIASES),
     (left, right) => strlen(right) - strlen(left))
   s_language_of_group = {}
@@ -370,7 +395,7 @@ def RangeRegion(start: number, lines: list<string>, fallback: dict<string>): dic
   var idx = 0
   while idx < len(lines)
     var text = lines[idx]
-    if text !~# '^\s*$'
+    if text !~# BLANK
       var found = ContextLanguage(start + idx, text, buffer_language)
       if empty(found)
         return fallback
@@ -422,7 +447,7 @@ export def Toggle(first: number, last: number)
     var remove = true
     var content = false
     for text in lines
-      if text !~# '^\s*$'
+      if text !~# BLANK
         content = true
         if !IsCommented(text, region)
             && (region is fallback || !IsCommented(text, fallback))
@@ -457,7 +482,7 @@ def OperatorApply(_type: string)
 enddef
 
 export def Operator()
-  &operatorfunc = matchstr(expand('<SID>'), '<SNR>\d\+_') .. 'OperatorApply'
+  &operatorfunc = matchstr(expand('<SID>'), '\m<SNR>\d\+_') .. 'OperatorApply'
   s_operator_pending = true
   feedkeys('g@', 'n')
 enddef
@@ -474,7 +499,7 @@ def ContextReport(): string
   if !Detecting(1)
     return 'off (syntax or g:simplecomment_context_lines)'
   endif
-  if text =~# '^\s*$'
+  if text =~# BLANK
     return 'blank line'
   endif
   Prepare()
