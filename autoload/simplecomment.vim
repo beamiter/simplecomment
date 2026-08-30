@@ -484,7 +484,12 @@ enddef
 export def Operator()
   &operatorfunc = matchstr(expand('<SID>'), '\m<SNR>\d\+_') .. 'OperatorApply'
   s_operator_pending = true
-  feedkeys('g@', 'n')
+  # `gc` is also a prefix of the `gcc` mapping.  By the time Vim decides that
+  # a following key is a motion rather than the extra `c`, that key is already
+  # in typeahead.  Appending g@ put the motion in front of the operator: `gcj`
+  # moved down one line and only then entered operator-pending mode.  Insert g@
+  # at the head so it consumes the motion that caused this mapping to resolve.
+  feedkeys('g@', 'in')
 enddef
 
 export def Visual()

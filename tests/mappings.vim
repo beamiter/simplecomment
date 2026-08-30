@@ -137,6 +137,34 @@ assert_match('simplecomment', maparg('<Plug>(simplecomment-operator)', 'n'))
 assert_match('simplecomment', maparg('<Plug>(simplecomment-toggle-line)', 'n'))
 assert_match('simplecomment', maparg('<Plug>(simplecomment-toggle)', 'x'))
 
+# --- the mappings execute the range the user typed --------------------------
+#
+# <ScriptCmd> keeps Visual mode active.  Until the mapping explicitly left it,
+# '< and '> still named the previous selection: the first visual gc did nothing
+# (both marks were zero), and every later one toggled the range selected before
+# the current one.
+ClearMaps()
+Load()
+new
+setlocal filetype=python
+&l:commentstring = '# %s'
+setline(1, ['one', 'two', 'three'])
+cursor(1, 1)
+feedkeys('Vjgc', 'xt')
+assert_equal(['# one', '# two', 'three'], getline(1, 3),
+  'visual gc used the previous Visual marks instead of the active range')
+
+# feedkeys() appends by default.  Since gc is a prefix of gcc, the motion that
+# disambiguates the two mappings is already in typeahead when Operator() runs;
+# g@ must be inserted ahead of it or `gcj` executes j first and leaves g@
+# pending without changing any text.
+setline(1, ['one', 'two', 'three'])
+cursor(1, 1)
+feedkeys('gcj', 'xt')
+assert_equal(['# one', '# two', 'three'], getline(1, 3),
+  'gc{motion} put g@ behind the motion in typeahead')
+bwipeout!
+
 if !empty(v:errors)
   writefile(v:errors, ROOT .. '/tests/errors.log')
   cquit

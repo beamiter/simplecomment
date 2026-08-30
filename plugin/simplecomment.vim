@@ -19,7 +19,11 @@ command! SimpleCommentHealth simplecomment#Health()
 
 nnoremap <silent> <Plug>(simplecomment-toggle-line) <ScriptCmd>simplecomment#Toggle(line('.'), line('.'))<CR>
 nnoremap <silent> <Plug>(simplecomment-operator) <ScriptCmd>simplecomment#Operator()<CR>
-xnoremap <silent> <Plug>(simplecomment-toggle) <ScriptCmd>simplecomment#Visual()<CR>
+# <ScriptCmd> deliberately preserves Visual mode, so '< and '> still name the
+# previous selection while it runs.  Leave Visual mode first: that commits the
+# current range to the marks Visual() reads and returns the user to Normal mode
+# after the toggle, like a regular Visual operator.
+xnoremap <silent> <Plug>(simplecomment-toggle) <Esc><ScriptCmd>simplecomment#Visual()<CR>
 
 # Defaults never replace a mapping owned by the user.  plugin/ files load after
 # vimrc, so an unconditional `nmap gc` silently took over a `gc` the user had
