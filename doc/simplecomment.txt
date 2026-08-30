@@ -18,6 +18,12 @@ gc{motion}               Toggle the operated lines.
 Set g:simplecomment_default_mappings to zero before loading to disable the
 default keys.  The three <Plug> mappings remain available.
 
+Existing user mappings are never replaced.  Each default key is installed only
+when |maparg()| says it is still free and |hasmapto()| says the <Plug> target
+it points at is not already bound to a key of your own, so a `gc` set in your
+vimrc survives the plugin loading after it, and putting the operator on a key
+you picked does not also claim `gc`.
+
                                                 *simplecomment-regions*
 REGIONS
 

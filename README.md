@@ -11,7 +11,9 @@ A small Vim9 comment operator driven by the buffer-local `commentstring`.
   `<Plug>(simplecomment-toggle)` are available when default mappings are off.
 
 Set `g:simplecomment_default_mappings = 0` before loading to keep only the
-commands and `<Plug>` mappings. Remote buffers need no special path handling:
+commands and `<Plug>` mappings. Existing user mappings are never replaced: a
+default key is taken only when it is still free and its `<Plug>` target is not
+already bound elsewhere. Remote buffers need no special path handling:
 the plugin edits the current Vim buffer and lets its owner handle writes.
 
 ## Regions
