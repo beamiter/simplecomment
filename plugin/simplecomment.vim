@@ -14,6 +14,14 @@ endif
 
 g:simplecomment_default_mappings = get(g:, 'simplecomment_default_mappings', 1)
 
+def DefaultMappings(): bool
+  var configured: any = g:simplecomment_default_mappings
+  if type(configured) == v:t_bool
+    return configured
+  endif
+  return type(configured) == v:t_number ? configured != 0 : true
+enddef
+
 command! -range SimpleCommentToggle simplecomment#Toggle(<line1>, <line2>)
 command! SimpleCommentHealth simplecomment#Health()
 
@@ -32,7 +40,7 @@ xnoremap <silent> <Plug>(simplecomment-toggle) <Esc><ScriptCmd>simplecomment#Vis
 # maparg() answers "is this key still free"; hasmapto() answers "has the user
 # already routed this <Plug> target somewhere of their own", in which case they
 # do not also want the default key taken.
-if g:simplecomment_default_mappings
+if DefaultMappings()
   if maparg('gc', 'n') ==# '' && !hasmapto('<Plug>(simplecomment-operator)', 'n')
     nmap gc <Plug>(simplecomment-operator)
   endif

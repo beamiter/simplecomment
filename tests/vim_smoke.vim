@@ -1,6 +1,7 @@
 vim9script
 
 set nocompatible nomore
+set cmdheight=20
 const ROOT = fnamemodify(resolve(expand('<sfile>:p')), ':h:h')
 execute 'set runtimepath^=' .. fnameescape(ROOT)
 execute 'source ' .. fnameescape(ROOT .. '/plugin/simplecomment.vim')
@@ -83,6 +84,93 @@ simplecomment#Toggle(2, 2)
 assert_equal(['# one', ''], getline(1, 2))
 simplecomment#Toggle(2, 1)
 assert_equal(['# one', ''], getline(1, 2))
+
+# A dotted 'filetype' is the first component only: html.mustache is HTML, not a
+# made-up language, so the buffer's commentstring keeps winning.
+setlocal filetype=python.django commentstring=#\ %s
+setline(1, ['print(1)'])
+deletebufline('%', 2, '$')
+simplecomment#Toggle(1, 1)
+assert_equal('# print(1)', getline(1),
+  'a dotted filetype did not use the buffer commentstring')
+simplecomment#Toggle(1, 1)
+assert_equal('print(1)', getline(1))
+
+# Ranges that invert or sit outside the buffer must not throw and must not
+# invent a line to comment.
+setline(1, ['keep'])
+deletebufline('%', 2, '$')
+simplecomment#Toggle(0, 0)
+assert_equal(['keep'], getline(1, 1))
+simplecomment#Toggle(-3, 1)
+assert_equal(['# keep'], getline(1, 1))
+
+# Unwritable buffers warn and leave the text alone; Health must agree instead
+# of reporting "writable" because 'modifiable' is still set.
+setline(1, ['keep'])
+setlocal readonly
+try
+  silent simplecomment#Toggle(1, 1)
+catch
+  assert_report('a readonly buffer threw: ' .. v:exception)
+endtry
+assert_equal('keep', getline(1), 'a readonly buffer was edited')
+setlocal noreadonly
+setlocal nomodifiable
+try
+  silent simplecomment#Toggle(1, 1)
+catch
+  assert_report('a nomodifiable buffer threw: ' .. v:exception)
+endtry
+assert_equal('keep', getline(1), 'a nomodifiable buffer was edited')
+setlocal modifiable
+
+# Unusable commentstring values are a no-op, not an operator exception, and
+# Health names the gap instead of printing an empty marker.
+&l:commentstring = ''
+try
+  silent simplecomment#Toggle(1, 1)
+catch
+  assert_report('an empty commentstring threw: ' .. v:exception)
+endtry
+assert_equal('keep', getline(1))
+&l:commentstring = ' %s'
+try
+  silent simplecomment#Toggle(1, 1)
+catch
+  assert_report('a marker-less commentstring threw: ' .. v:exception)
+endtry
+assert_equal('keep', getline(1))
+&l:commentstring = '%s '
+try
+  silent simplecomment#Toggle(1, 1)
+catch
+  assert_report('a suffix-only commentstring threw: ' .. v:exception)
+endtry
+assert_equal('keep', getline(1))
+&l:commentstring = '# %s'
+
+# Non-string table entries are skipped, not compared as markers.
+g:simplecomment_commentstrings = {python: 3}
+try
+  simplecomment#Toggle(1, 1)
+catch
+  assert_report('a non-string commentstring table value threw: ' .. v:exception)
+endtry
+assert_equal('# keep', getline(1))
+unlet g:simplecomment_commentstrings
+simplecomment#Toggle(1, 1)
+assert_equal('keep', getline(1))
+
+# Toggle must put the cursor back: fence detection (and setline) used to be
+# able to leave it on column 1 of another line.
+setline(1, ['alpha()', '  beta()'])
+cursor(2, 4)
+simplecomment#Toggle(1, 2)
+assert_equal([2, 4], [line('.'), col('.')],
+  'Toggle moved the cursor while rewriting the range')
+assert_equal(['# alpha()', '  # beta()'], getline(1, 2))
+simplecomment#Toggle(1, 2)
 
 assert_equal(2, exists(':SimpleCommentToggle'))
 assert_match('simplecomment', maparg('<Plug>(simplecomment-toggle-line)', 'n'))

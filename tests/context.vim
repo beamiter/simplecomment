@@ -124,6 +124,15 @@ Open('fenced.md', '<!--%s-->')
 simplecomment#Toggle(18, 18)
 assert_equal('// const q = 1;', getline(18))
 
+# `c++` is the other spelling of cpp; the fence info string is what the syntax
+# engine will never tell us, so the alias table has to.
+Open('fenced.md', '<!--%s-->')
+simplecomment#Toggle(24, 24)
+assert_equal('// int y = 1;', getline(24),
+  'a ```c++ fence did not use C++ markers')
+simplecomment#Toggle(24, 24)
+assert_equal('int y = 1;', getline(24))
+
 # --- unknown context falls back, it never guesses --------------------------
 
 # ```mermaid has no entry in the table, so the buffer's 'commentstring' is used
@@ -257,6 +266,28 @@ unlet g:simplecomment_context_lines
 # Runtime configuration is read on every toggle.  A typo must fall back to the
 # defaults instead of throwing from an operator, and alias keys are normalized
 # the same way fence/filetype names are.
+g:simplecomment_context_lines = v:true
+Open('embedded.html', '<!--%s-->')
+try
+  simplecomment#Toggle(3, 3)
+catch
+  assert_report('a bool context limit threw: ' .. v:exception)
+endtry
+assert_equal('    // let x = 1;', getline(3),
+  'a bool context limit did not fall back to the numeric default')
+unlet g:simplecomment_context_lines
+
+g:simplecomment_commentstrings = {javascript: 'NOPE'}
+Open('embedded.html', '<!--%s-->')
+try
+  simplecomment#Toggle(3, 3)
+catch
+  assert_report('an invalid commentstring override threw: ' .. v:exception)
+endtry
+assert_equal('    <!-- let x = 1; -->', getline(3),
+  'a marker-less override must fall back to commentstring, not emit NOPE')
+unlet g:simplecomment_commentstrings
+
 g:simplecomment_context_lines = 'many'
 Open('embedded.html', '<!--%s-->')
 try

@@ -121,6 +121,31 @@ assert_match('simplecomment-toggle', maparg('gc', 'x'),
   'visual gc was skipped by a hasmapto() prefix collision with the line toggle')
 nunmap <F9>
 
+# --- a mistyped opt-in must not abort plugin load ----------------------------
+#
+# plugin/simplecomment.vim is vim9script, so `if g:simplecomment_default_mappings`
+# with a list or the string '0' is E745 / E1135 at source time and the <Plug>
+# maps never exist.  Invalid types fall back to the documented default (on).
+
+ClearMaps()
+g:simplecomment_default_mappings = '0'
+try
+  Load()
+catch
+  assert_report('a string default-mappings flag threw at load: ' .. v:exception)
+endtry
+assert_match('simplecomment-operator', maparg('gc', 'n'),
+  'a mistyped mappings flag skipped the defaults instead of falling back')
+g:simplecomment_default_mappings = []
+try
+  Load()
+catch
+  assert_report('a list default-mappings flag threw at load: ' .. v:exception)
+endtry
+assert_match('simplecomment-toggle-line', maparg('gcc', 'n'),
+  'a list mappings flag skipped gcc')
+g:simplecomment_default_mappings = 1
+
 # --- the opt-out still installs nothing -------------------------------------
 
 ClearMaps()
@@ -163,6 +188,8 @@ cursor(1, 1)
 feedkeys('gcj', 'xt')
 assert_equal(['# one', '# two', 'three'], getline(1, 3),
   'gc{motion} put g@ behind the motion in typeahead')
+assert_match('operator: idle', execute('SimpleCommentHealth'),
+  'a completed gc{motion} left Health reporting operator: pending')
 bwipeout!
 
 if !empty(v:errors)

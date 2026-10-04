@@ -19,3 +19,8 @@ const q = 1;
 ```
 
 More prose.
+
+```c++
+int y = 1;
+```
+
